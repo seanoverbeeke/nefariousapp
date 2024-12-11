@@ -5,7 +5,7 @@ import backgroundPopcorn from './assets/appbackground.jpg';
 function App() {
     const registerRentalApiUrl = 'https://k8vt6n911b.execute-api.us-east-1.amazonaws.com/default/registerRental';
     const startRentalApiUrl = 'https://gzrcpz0sxj.execute-api.us-east-1.amazonaws.com/default/startRental';
-    const videoUrl = 'https://d2tsu3r8qeqtsh.cloudfront.net/greengoldsample.m3u8';
+    const videoUrl = 'https://d2tsu3r8qeqtsh.cloudfront.net/nefarious.m3u8';
 
     // State management
     const [isAuthorized, setIsAuthorized] = useState(false);
