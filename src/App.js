@@ -17,6 +17,11 @@ function App() {
     const [hasRentalEnded, setHasRentalEnded] = useState(false);
     const [authenticationComplete, setAuthenticationComplete] = useState(false);
 
+    // Detect if the user is on an iOS device
+    const isIOS = () => {
+        return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    };
+
     const searchParams = new URLSearchParams(window.location.search);
     const nfctagid = searchParams.get('nfctagid');
 
@@ -222,26 +227,40 @@ function App() {
                             X
                         </button>
 
-                        <ReactPlayer
-                            url={videoUrl}
-                            width="100%"
-                            height="100%"
-                            controls
-                            playing
-                            muted={true} // Fixes autoplay restrictions
-                            config={{
-                                file: {
-                                    forceHLS: true, // Forces HLS playback
-                                    attributes: {
-                                        crossOrigin: 'anonymous', // Ensures proper cross-origin handling
+                        {isIOS() ? (
+                            <video
+                                src={videoUrl}
+                                width="100%"
+                                height="100%"
+                                controls
+                                autoPlay
+                                crossOrigin="anonymous"
+                                onError={(e) => {
+                                    console.error('Video Playback Error:', e);
+                                    setError('Failed to play video. Please try again.');
+                                }}
+                            />
+                        ) : (
+                            <ReactPlayer
+                                url={videoUrl}
+                                width="100%"
+                                height="100%"
+                                controls
+                                playing
+                                config={{
+                                    file: {
+                                        forceHLS: true,
+                                        attributes: {
+                                            crossOrigin: 'anonymous',
+                                        },
                                     },
-                                },
-                            }}
-                            onError={(e) => {
-                                console.error('Player Error:', e);
-                                setError('Failed to play video. Please try again.');
-                            }}
-                        />
+                                }}
+                                onError={(e) => {
+                                    console.error('Player Error:', e);
+                                    setError('Failed to play video. Please try again.');
+                                }}
+                            />
+                        )}
                     </div>
                 )}
             </div>
