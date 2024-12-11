@@ -228,15 +228,12 @@ function App() {
                             height="100%"
                             controls
                             playing
+                            muted={true} // Fixes autoplay restrictions
                             config={{
                                 file: {
-                                    forceHLS: true,
+                                    forceHLS: true, // Forces HLS playback
                                     attributes: {
-                                        crossOrigin: 'anonymous',
-                                    },
-                                    hlsOptions: {
-                                        debug: true,
-                                        enableWorker: true,
+                                        crossOrigin: 'anonymous', // Ensures proper cross-origin handling
                                     },
                                 },
                             }}
