@@ -1,155 +1,62 @@
 import React, { useState, useEffect } from 'react';
 import ReactPlayer from 'react-player';
-import backgroundPopcorn from './assets/appbackground.jpg';
+
+const CONTENT_API = 'https://ngk1i8c791.execute-api.us-east-1.amazonaws.com/get-content';
 
 function App() {
-    const registerRentalApiUrl = 'https://k8vt6n911b.execute-api.us-east-1.amazonaws.com/default/registerRental';
-    const startRentalApiUrl = 'https://gzrcpz0sxj.execute-api.us-east-1.amazonaws.com/default/startRental';
-    const videoUrl = 'https://d2tsu3r8qeqtsh.cloudfront.net/nefarious.m3u8';
-
-    // State management
-    const [isAuthorized, setIsAuthorized] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
+    const [content, setContent] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [rentalActive, setRentalActive] = useState(false);
     const [showVideo, setShowVideo] = useState(false);
-    const [hoursLeft, setHoursLeft] = useState(24);
-    const [hasRentalEnded, setHasRentalEnded] = useState(false);
-    const [authenticationComplete, setAuthenticationComplete] = useState(false);
+    const [playTrailer, setPlayTrailer] = useState(false);
 
-    // Detect if the user is on an iOS device
-    const isIOS = () => {
-        return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    };
+    const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
     const searchParams = new URLSearchParams(window.location.search);
-    const nfctagid = searchParams.get('nfctagid');
+    const contentId = searchParams.get('contentId');
 
     useEffect(() => {
-        const checkRentalStatus = async () => {
-            if (!authenticationComplete && nfctagid && !isAuthorized) {
-                try {
-                    setIsLoading(true);
+        const fetchContent = async () => {
+            if (!contentId) {
+                setError('No movie specified. Please scan a valid MovieCoin.');
+                setIsLoading(false);
+                return;
+            }
 
-                    // Step 1: Check Registration
-                    const registerResponse = await fetch(registerRentalApiUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ nfctagid }),
-                    });
+            try {
+                const response = await fetch(`${CONTENT_API}?contentId=${contentId}`);
+                const data = await response.json();
 
-                    const registerData = await registerResponse.json();
-
-                    if (registerData.success) {
-                        setIsAuthorized(true);
-
-                        // Check if the rental is already active
-                        if (registerData.data?.startTime) {
-                            const currentTime = Date.now();
-                            const startTime = registerData.data.startTime;
-                            const durationHours = registerData.data.durationHours || 24;
-
-                            const hoursElapsed = (currentTime - startTime) / (1000 * 60 * 60);
-
-                            if (hoursElapsed < durationHours) {
-                                setRentalActive(true);
-                                setHoursLeft(Math.max(0, durationHours - Math.floor(hoursElapsed)));
-                                setHasRentalEnded(false);
-                                return;
-                            }
-                        }
-
-                        // If no startTime or rental is expired, show "Start Rental"
-                        setRentalActive(false);
-                        setHasRentalEnded(false);
-                    } else {
-                        setError(registerData.message);
-                    }
-                } catch (error) {
-                    setError('Failed to check rental status. Please try again.');
-                } finally {
-                    setIsLoading(false);
-                    setAuthenticationComplete(true);
+                if (response.ok && data.movieUrl) {
+                    setContent(data);
+                } else {
+                    setError('Movie not found. Please try a different MovieCoin.');
                 }
+            } catch (err) {
+                console.error('Error fetching content:', err);
+                setError('Failed to load movie. Please try again.');
+            } finally {
+                setIsLoading(false);
             }
         };
 
-        checkRentalStatus();
-    }, [nfctagid, authenticationComplete, isAuthorized]);
-
-    const handleStartRental = async () => {
-        if (!nfctagid) {
-            setError('No rental ID found');
-            return;
-        }
-
-        try {
-            setIsLoading(true);
-
-            const response = await fetch(startRentalApiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ nfctagid }),
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-
-            if (data.success) {
-                setRentalActive(true);
-                setHasRentalEnded(false);
-                setHoursLeft(data.hoursRemaining);
-                setError(null);
-            } else {
-                setError(data.message);
-            }
-        } catch (error) {
-            setError('Failed to start rental. Please try again.');
-        } finally {
-            setIsLoading(false);
-        }
-    };
+        fetchContent();
+    }, [contentId]);
 
     const handlePlay = () => {
+        setPlayTrailer(false);
         setShowVideo(true);
     };
 
-    const handleRentAgain = () => {
-        setRentalActive(false);
-        setShowVideo(false);
-        setHasRentalEnded(false);
-        setHoursLeft(24);
-        setError(null);
+    const handlePlayTrailer = () => {
+        setPlayTrailer(true);
+        setShowVideo(true);
     };
 
     const handleCloseVideo = () => {
         setShowVideo(false);
+        setPlayTrailer(false);
     };
-
-    useEffect(() => {
-        if (!isAuthorized || !rentalActive) return;
-
-        const timer = setInterval(() => {
-            setHoursLeft((prev) => {
-                const newHours = Math.max(prev - 1, 0);
-                if (newHours === 0) {
-                    setRentalActive(false);
-                    setShowVideo(false);
-                    setHasRentalEnded(true);
-                }
-                return newHours;
-            });
-        }, 1000 * 60 * 60); // Decrease every hour
-
-        return () => clearInterval(timer);
-    }, [rentalActive, isAuthorized]);
 
     if (isLoading) {
         return (
@@ -162,87 +69,75 @@ function App() {
     if (error) {
         return (
             <div className="w-screen h-screen bg-black flex items-center justify-center">
-                <div className="text-white text-center">
-                    <h1 className="text-3xl font-bold mb-4">Error</h1>
+                <div className="text-white text-center px-4">
+                    <h1 className="text-3xl font-bold mb-4">MovieCoin™</h1>
                     <p className="text-xl">{error}</p>
                 </div>
             </div>
         );
     }
 
-    if (!isAuthorized) {
-        return (
-            <div className="w-screen h-screen bg-black flex items-center justify-center">
-                <h1 className="text-white text-3xl font-bold">Authorizing...</h1>
-            </div>
-        );
-    }
-
-    let buttonLabel = '';
-    let buttonAction = null;
-
-    if (!rentalActive && !hasRentalEnded) {
-        buttonLabel = 'Start Rental';
-        buttonAction = handleStartRental;
-    } else if (rentalActive) {
-        buttonLabel = 'Play';
-        buttonAction = handlePlay;
-    } else if (hasRentalEnded) {
-        buttonLabel = 'Rent Again';
-        buttonAction = handleRentAgain;
-    }
+    const videoSrc = playTrailer ? content.trailerUrl : content.movieUrl;
 
     return (
         <div className="bg-black min-h-screen overflow-auto flex items-center justify-center">
-            <div className="w-full max-w-[1080px] aspect-[9/16] bg-black relative mx-auto">
+            <div className="w-full max-w-[1080px] bg-black relative mx-auto">
                 {!showVideo ? (
-                    <>
-                        <img
-                            src={backgroundPopcorn}
-                            alt="Movie Poster"
-                            className="w-full h-full object-contain bg-black"
-                        />
-                        {rentalActive && (
-                            <div
-                                className="absolute left-0 right-0 text-center text-white text-xl font-bold bg-black/50 py-2"
-                                style={{ bottom: '180px' }}
-                            >
-                                {hoursLeft} Hours Remaining
-                            </div>
+                    <div className="flex flex-col items-center justify-center min-h-screen px-4">
+                        {content.contentPosterUrl && (
+                            <img
+                                src={content.contentPosterUrl}
+                                alt={content.contentTitle}
+                                className="w-full max-w-md rounded-lg shadow-lg mb-6"
+                                style={{ maxHeight: '60vh', objectFit: 'contain' }}
+                            />
+                        )}
+                        <h1 className="text-white text-3xl font-bold mb-2 text-center">
+                            {content.contentTitle}
+                        </h1>
+                        {content.contentDescription && (
+                            <p className="text-gray-400 text-center max-w-md mb-8 text-sm leading-relaxed">
+                                {content.contentDescription}
+                            </p>
                         )}
                         <button
-                            onClick={buttonAction}
-                            className="absolute left-1/2 transform -translate-x-1/2 px-12 py-4 text-white text-xl font-bold rounded-lg hover:opacity-90 bg-green-600"
-                            style={{ bottom: '100px' }}
+                            onClick={handlePlay}
+                            className="px-12 py-4 text-white text-xl font-bold rounded-lg hover:opacity-90 bg-green-600"
                         >
-                            {buttonLabel}
+                            ▶ Play Movie
                         </button>
-                    </>
+                        {content.trailerUrl && (
+                            <button
+                                onClick={handlePlayTrailer}
+                                className="mt-4 px-8 py-3 text-white text-lg font-bold rounded-lg hover:opacity-90 bg-gray-700"
+                            >
+                                Watch Trailer
+                            </button>
+                        )}
+                    </div>
                 ) : (
-                    <div className="w-full h-full relative bg-black">
+                    <div className="w-screen h-screen relative bg-black">
                         <button
                             onClick={handleCloseVideo}
-                            className="absolute top-4 right-4 z-50 bg-black text-white rounded-full px-4 py-2 text-xl font-bold hover:opacity-90"
+                            className="absolute top-4 right-4 z-50 bg-black/70 text-white rounded-full px-4 py-2 text-xl font-bold hover:opacity-90"
                         >
-                            X
+                            ✕
                         </button>
-
                         {isIOS() ? (
                             <video
-                                src={videoUrl}
+                                src={videoSrc}
                                 width="100%"
                                 height="100%"
                                 controls
                                 autoPlay
+                                playsInline
                                 crossOrigin="anonymous"
-                                onError={(e) => {
-                                    console.error('Video Playback Error:', e);
-                                    setError('Failed to play video. Please try again.');
-                                }}
+                                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                onError={() => setError('Failed to play video. Please try again.')}
                             />
                         ) : (
                             <ReactPlayer
-                                url={videoUrl}
+                                url={videoSrc}
                                 width="100%"
                                 height="100%"
                                 controls
@@ -250,15 +145,10 @@ function App() {
                                 config={{
                                     file: {
                                         forceHLS: true,
-                                        attributes: {
-                                            crossOrigin: 'anonymous',
-                                        },
+                                        attributes: { crossOrigin: 'anonymous' },
                                     },
                                 }}
-                                onError={(e) => {
-                                    console.error('Player Error:', e);
-                                    setError('Failed to play video. Please try again.');
-                                }}
+                                onError={() => setError('Failed to play video. Please try again.')}
                             />
                         )}
                     </div>
